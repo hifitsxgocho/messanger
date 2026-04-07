@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: messenger
+      POSTGRES_USER: messenger
+      POSTGRES_PASSWORD: messenger_secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U messenger"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://messenger:messenger_secret@postgres:5432/messenger?sslmode=disable
+      JWT_SECRET: super-secret-jwt-key-change-in-prod
+      SERVER_PORT: "8080"
+      AVATAR_DIR: /app/avatars
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - avatars:/app/avatars
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  avatars:
